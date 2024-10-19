@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fortnite Player Stats</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom right, #1a1a1a, #0f0f0f);
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            color: #ffcc00;
+            text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.8);
+        }
+        input[type="text"] {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            margin: 10px 0;
+            width: 80%;
+            max-width: 400px;
+            font-size: 16px;
+            color: #000;
+        }
+        button {
+            background-color: #ffcc00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #ffd700;
+        }
+        .loading {
+            display: none;
+            font-size: 18px;
+            color: #ffffff;
+            margin-top: 20px;
+        }
+        .stats-result {
+            margin-top: 20px;
+            background: rgba(255, 204, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s;
+        }
+        .progress-container {
+            width: 100%;
+            background: rgba(255, 204, 0, 0.4);
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 10px;
+            background: #ffcc00;
+            border-radius: 5px;
+            transition: width 0.3s;
+        }
+        .embed-message {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            color: white;
+            font-weight: bold;
+        }
+        .error-red {
+            background-color: #f44336; /* Red */
+        }
+        .error-orange {
+            background-color: #ff9800; /* Orange */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Fortnite Player Stats Checker</h1>
+    <input type="text" id="username" placeholder="Enter Fortnite Username">
+    <button id="fetch-stats">Get Stats</button>
+
+    <div id="loading-container" class="loading">Loading... Please wait!</div>
+    <div id="stats-result" class="stats-result"></div>
+
+    <script>
+        const API_KEY = 'none'; 
+
+        document.getElementById('fetch-stats').addEventListener('click', fetchPlayerStats);
+
+        // Check online/offline status
+        window.addEventListener('offline', () => {
+            displayEmbedMessage('⚠️ <strong>You are offline! Please check your internet connection.</strong>', 'red');
+            document.getElementById('fetch-stats').disabled = true; // Disable the button
+        });
+
+        window.addEventListener('online', () => {
+            displayEmbedMessage('✅ <strong>You are back online!</strong>', 'orange');
+            document.getElementById('fetch-stats').disabled = false; // Enable the button
+        });
+
+        async function fetchPlayerStats() {
+            const username = document.getElementById('username').value.trim();
+            const loadingContainer = document.getElementById('loading-container');
+            const statsResult = document.getElementById('stats-result');
+            
+            if (username === '') {
+                displayEmbedMessage('⚠️ <strong>Please enter a username!</strong>', 'orange');
+                return;
+            }
+
+            loadingContainer.classList.remove('hidden');
+            statsResult.innerHTML = '';
+
+            // Simulate 10-second delay for loading effect
+            setTimeout(async () => {
+                try {
+                    // Check for online status
+                    if (!navigator.onLine) {
+                        loadingContainer.classList.add('hidden'); // Hide loading animation
+                        displayEmbedMessage('⚠️ <strong>You seem to be offline! Please check your internet connection.</strong>', 'red');
+                        return;
+                    }
+
+                    const response = await fetch(`https://fortniteapi.io/v1/stats?username=${username}`, {
+                        headers: {
+                            'Authorization': API_KEY
+                        }
+                    });
+
+                    loadingContainer.classList.add('hidden'); // Hide loading animation
+
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            displayEmbedMessage(`❌ <strong>I can't find a player named "${username}"!</strong>`, 'orange');
+                        } else {
+                            displayEmbedMessage('⚠️ <strong>Error fetching player stats.</strong>', 'red');
+                        }
+                        return;
+                    }
+
+                    const data = await response.json();
+                    displayPlayerStats(data);
+                } catch (error) {
+                    loadingContainer.classList.add('hidden'); // Hide loading animation
+                    displayEmbedMessage(`⚠️ <strong>An error occurred: ${error.message}!</strong>`, 'red');
+                }
+            }, 1); // 10 seconds delay
+        }
+
+        function displayPlayerStats(data) {
+            const statsDiv = document.getElementById('stats-result');
+
+            // Check if data is valid
+            if (!data.result) {
+                displayEmbedMessage(`❌ <strong>I can't find a player named "${document.getElementById('username').value}"!</strong>`, 'orange');
+                return;
+            }
+
+            // Check if the player's level is 0
+            if (data.account.level === 0) {
+                displayEmbedMessage(`❌ <strong>This user does not exist, try again something like that.</strong>`, 'orange');
+                return;
+            }
+
+            statsDiv.innerHTML = `
+                <h3><strong>${data.name}'s Stats 🏆</strong></h3>
+                <p><strong>Account Level:</strong> ${data.account.level} 📊</p>
+                <p><strong>Season:</strong> ${data.account.season} ⏳</p>
+                <div><strong>Progress Percentage:</strong> ${data.account.process_pct}% 🚀</div>
+                <div class="progress-container">
+                    <div class="progress-bar" style="width: ${data.account.process_pct}%"></div>
+                </div>
+                <h4><strong>Global Stats 🎮</strong></h4>
+                ${displayGameModeStats(data.global_stats)}
+            `;
+        }
+
+        function displayGameModeStats(globalStats) {
+            let statsHtml = '';
+            for (const [mode, stats] of Object.entries(globalStats)) {
+                statsHtml += `
+                    <div class="mode-stats">
+                        <h5><strong>${mode.charAt(0).toUpperCase() + mode.slice(1)} Stats 🚀</strong></h5>
+                        <p><strong>Wins:</strong> ${stats.placetop1} 🏅</p>
+                        <p><strong>Kills:</strong> ${stats.kills} 💀</p>
+                        <p><strong>Matches Played:</strong> ${stats.matchesplayed} 🎯</p>
+                        <p><strong>Kill/Death Ratio:</strong> ${stats.kd.toFixed(2)} ⚔️</p>
+                    </div>
+                `;
+            }
+            return statsHtml;
+        }
+
+        function displayEmbedMessage(message, color) {
+            const statsResult = document.getElementById('stats-result');
+            const colorClass = color === 'red' ? 'error-red' : 'error-orange';
+            const embedDiv = document.createElement('div');
+            embedDiv.classList.add('embed-message', colorClass);
+            embedDiv.innerHTML = message;
+            statsResult.innerHTML = ''; // Clear previous messages
+            statsResult.appendChild(embedDiv);
+        }
+    </script>
+</body>
+</html>
